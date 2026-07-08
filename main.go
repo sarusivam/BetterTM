@@ -98,8 +98,10 @@ func GetMacLinuxPorts() ([]ProcessInfo, error) {
 func main() {
 	a := app.New()
 	w := a.NewWindow("BetterTM - Port Scanner")
-
+	searchEntry := widget.NewEntry()
+	searchEntry.SetPlaceHolder("Search by App Name or Port...")
 	data, _ := GetMacLinuxPorts()
+	footer := widget.NewLabel(strconv.Itoa(len(data)) + " processes found")
 	var table *widget.Table
 	table = widget.NewTable(
 		func() (int, int) {
@@ -153,24 +155,49 @@ func main() {
 	table.SetColumnWidth(3, 80)
 	table.SetColumnWidth(4, 80)
 
+	searchEntry.OnChanged = func(text string) {
+		nData, err := GetMacLinuxPorts()
+
+		if text == "" {
+			if err == nil {
+				data = nData
+				footer.SetText(strconv.Itoa(len(data)) + " processes found")
+			}
+		} else {
+			newData := []ProcessInfo{}
+			for _, p := range nData {
+				if strings.Contains(strings.ToLower(p.AppName), strings.ToLower(text)) || strings.Contains(p.Port, text) {
+					newData = append(newData, p)
+				}
+			}
+			data = newData
+			footer.SetText(strconv.Itoa(len(data)) + " results found")
+		}
+		table.Refresh()
+	}
+
 	go func() {
 		ticker := time.NewTicker(time.Second)
 		defer ticker.Stop()
 
 		for range ticker.C {
 			// Fetch new system snapshot
-			freshData, err := GetMacLinuxPorts()
-			if err == nil {
-				// Safely overwrite the global slice map
-				data = freshData
+			searchText := searchEntry.Text
+			searchEntry.OnChanged(searchText) // Reapply search filter after refreshing data
+			// freshData, err := GetMacLinuxPorts()
+			// if err == nil {
+			// 	// Safely overwrite the global slice map
+			// 	data = freshData
 
-				// Tell the UI table component to repaint itself on screen
-				table.Refresh()
-			}
+			// 	// Tell the UI table component to repaint itself on screen
+			// 	table.Refresh()
+			// }
 		}
 	}()
+	mainLayout := container.NewBorder(searchEntry, footer, nil, nil, table)
 
-	w.SetContent(table)
+	w.SetContent(mainLayout)
+	// w.SetContent(table)
 	w.Resize(fyne.NewSize(550, 520))
 	w.ShowAndRun()
 }
