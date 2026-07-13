@@ -21,6 +21,25 @@ type ProcessInfo struct {
 	PID     string
 	Memory  string
 }
+type DimensionLayout struct {
+	OnResize func(fyne.Size)
+}
+
+func (d *DimensionLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	return fyne.NewSize(200, 100)
+}
+
+func (d *DimensionLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	// Trigger the callback whenever Fyne re-renders the container size
+	if d.OnResize != nil {
+		d.OnResize(size)
+	}
+	// Make all child objects scale to fit the window space
+	for _, obj := range objects {
+		obj.Resize(size)
+		obj.Move(fyne.NewPos(0, 0))
+	}
+}
 
 func GetMacLinuxPorts() ([]ProcessInfo, error) {
 	var list []ProcessInfo
@@ -96,6 +115,8 @@ func GetMacLinuxPorts() ([]ProcessInfo, error) {
 }
 
 func main() {
+	const ratio1 = 0.1538461538
+	const ratio2 = 0.3846153846
 	a := app.New()
 	w := a.NewWindow("BetterTM - Port Scanner")
 	searchEntry := widget.NewEntry()
@@ -184,17 +205,21 @@ func main() {
 			// Fetch new system snapshot
 			searchText := searchEntry.Text
 			searchEntry.OnChanged(searchText) // Reapply search filter after refreshing data
-			// freshData, err := GetMacLinuxPorts()
-			// if err == nil {
-			// 	// Safely overwrite the global slice map
-			// 	data = freshData
 
-			// 	// Tell the UI table component to repaint itself on screen
-			// 	table.Refresh()
-			// }
 		}
 	}()
-	mainLayout := container.NewBorder(searchEntry, footer, nil, nil, table)
+	layoutManager := &DimensionLayout{
+		OnResize: func(s fyne.Size) {
+			usableWidth := s.Width - 20 // Adjust for padding/margins
+			table.SetColumnWidth(0, usableWidth*ratio1)
+			table.SetColumnWidth(1, usableWidth*ratio2)
+			table.SetColumnWidth(2, usableWidth*ratio1)
+			table.SetColumnWidth(3, usableWidth*ratio1)
+			table.SetColumnWidth(4, usableWidth*ratio1)
+		},
+	}
+	responsiveContainer := container.New(layoutManager, table)
+	mainLayout := container.NewBorder(searchEntry, footer, nil, nil, responsiveContainer)
 
 	w.SetContent(mainLayout)
 	// w.SetContent(table)
